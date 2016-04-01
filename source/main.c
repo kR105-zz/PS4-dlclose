@@ -193,8 +193,6 @@ int _main(void) {
 	printfsocket("[+] UID = %d\n", getuid());
 	printfsocket("[+] GID = %d\n", getgid());
 
-	dump = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-
 	// Create exploit thread
 	if (scePthreadCreate(&thread1, NULL, exploitThread, NULL, "pthread_pene") != 0) {
 		printfsocket("[+] pthread_create error\n");

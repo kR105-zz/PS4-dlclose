@@ -2,7 +2,7 @@
 	Code written based on info available here http://cturt.github.io/dlclose-overflow.html
 
 	See attached LICENCE file
-	Thanks to CTurt and qwertyoruiop
+	Thanks to CTurt, qwertyoruiop and marcan
 
 	- @kr105rlz
 */

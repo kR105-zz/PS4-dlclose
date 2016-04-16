@@ -203,7 +203,7 @@ int _main(void) {
 	scePthreadJoin(thread1, NULL);
 
 	// At this point we should have root and jailbreak
-	if(getuid() && getuid()) {
+	if(getuid()) {
 		printfsocket("[+] Kernel patch failed!\n");
 		sceNetSocketClose(sock);
 		return 1;

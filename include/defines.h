@@ -1,19 +1,22 @@
-#if DEBUG_SOCKET
+#ifdef DEBUG_SOCKET
 	#define printfsocket(format, ...)\
 		do {\
 			char buffer[512];\
 			int size = sprintf(buffer, format, ##__VA_ARGS__);\
 			sceNetSend(sock, buffer, size, 0);\
 		} while(0)
-
-	int (*printfkernel)(const char *fmt, ...) = (void*)0xFFFFFFFF8246E340;
-
+	
+	#define sys_sendto (void *)0xffffffff8249ec10
+	
+	#define printfkernel(f, ...) \
+		do { \
+			int size = sprintf(dump, f, ##__VA_ARGS__); \
+			int (*sendto)(struct thread *td, struct sendto_args *uap) = (void *)sys_sendto; \
+			struct sendto_args args = { sock, dump, size, 0, NULL, 0 }; \
+			sendto(td, &args); \
+		} while(0)
 #else
-	#define printfsocket(format, ...) (void)0
-	int printfkernel(const char *fmt, ...)
-	{
-		return 0;
-	}
+	int (*printfkernel)(const char *fmt, ...) = (void *)0xFFFFFFFF8246E340;
 #endif
 
 #define	SLIST_ENTRY(type)						\

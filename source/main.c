@@ -244,9 +244,13 @@ int _main(void) {
 	printfsocket("[+] Kernel patch success!\n");
 
 	// Do any post-exploit stuff here
-
+	
+#ifdef DEBUG_SOCKET
+	munmap(dump, PAGE_SIZE);	
+#endif
+	
 	printfsocket("[+] bye\n");
 	sceNetSocketClose(sock);
-
+	
 	return 0;
 }

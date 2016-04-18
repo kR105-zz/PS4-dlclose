@@ -8,6 +8,7 @@
 	
 	#define sys_sendto (void *)0xffffffff8249ec10
 	
+	/*
 	#define printfkernel(f, ...) \
 		do { \
 			int size = sprintf(dump, f, ##__VA_ARGS__); \
@@ -15,6 +16,9 @@
 			struct sendto_args args = { sock, dump, size, 0, NULL, 0 }; \
 			sendto(td, &args); \
 		} while(0)
+	*/
+	
+	int (*printfkernel)(const char *fmt, ...) = (void *)0xFFFFFFFF8246E340;
 #else
 	int (*printfkernel)(const char *fmt, ...) = (void *)0xFFFFFFFF8246E340;
 #endif

